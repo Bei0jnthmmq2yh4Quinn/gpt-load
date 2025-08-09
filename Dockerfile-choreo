@@ -1,14 +1,20 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+# 1. 更新了 Go 的版本为 1.23
+FROM golang:1.23-alpine AS builder
+
+# 2. 在构建环境中安装 Node.js 和 npm，这是解决问题的关键！
+RUN apk add --no-cache npm
 
 WORKDIR /app
 
 COPY go.mod go.sum ./
 RUN go mod download
 
+# 复制所有源码
 COPY . .
 
 # 构建前端
+# 注意：现在环境里有 npm 了，这一步可以成功执行
 WORKDIR /app/web
 RUN npm install && npm run build
 
@@ -16,18 +22,20 @@ RUN npm install && npm run build
 WORKDIR /app
 RUN CGO_ENABLED=0 GOOS=linux go build -o gpt-load .
 
+# -----------------------------------------------------------------
+
 # Final stage
 FROM alpine:3.18
 
 WORKDIR /app
 
-# 从 builder 阶段复制构建好的二进制文件
-COPY --from=builder /app/gpt-load /gpt-load
+# 从 builder 阶段复制构建好的二进制文件到当前工作目录
+COPY --from=builder /app/gpt-load .
 # 从 builder 阶段复制构建好的前端文件
 COPY --from=builder /app/web/dist ./web/dist
 
-# 切换到 Choreo 指定的非 root 用户，这是解决此问题的关键！
+# 你做得非常好！Choreo 要求使用非 root 用户，这一行是正确的！
 USER 10014
 
-# 设置容器的启动命令
-ENTRYPOINT ["/gpt-load"]
+# 设置容器的启动命令（使用相对路径，因为我们已经在 WORKDIR /app 中）
+ENTRYPOINT ["./gpt-load"]
