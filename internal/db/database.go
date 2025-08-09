@@ -54,10 +54,28 @@ func NewDB(configManager types.ConfigManager) (*gorm.DB, error) {
 		}
 		dialector = mysql.Open(dsn)
 	} else {
-		if err := os.MkdirAll(filepath.Dir(dsn), 0755); err != nil {
-			return nil, fmt.Errorf("failed to create database directory: %w", err)
+		// --- MODIFICATION START ---
+		// This block is modified to handle deployments on read-only filesystems
+		// by using an environment variable for the data path.
+		
+		// Get the storage path from an environment variable.
+		// On Choreo, this should be set to the writable mount path (e.g., /data/writable).
+		dataPath := os.Getenv("DATA_PATH")
+		
+		// If DATA_PATH is set, we assume the DSN from config is just a filename
+		// and we construct the full path.
+		if dataPath != "" {
+			dsn = filepath.Join(dataPath, dsn)
+		}
+
+		// Ensure the directory for the SQLite file exists.
+		dbDir := filepath.Dir(dsn)
+		if err := os.MkdirAll(dbDir, 0755); err != nil {
+			// The error message now includes the path it tried to create for easier debugging.
+			return nil, fmt.Errorf("failed to create database directory at '%s': %w", dbDir, err)
 		}
 		dialector = sqlite.Open(dsn + "?_busy_timeout=5000")
+		// --- MODIFICATION END ---
 	}
 
 	var err error
