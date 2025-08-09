@@ -1,0 +1,33 @@
+# Build stage
+FROM golang:1.21-alpine AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+# 构建前端
+WORKDIR /app/web
+RUN npm install && npm run build
+
+# 构建后端
+WORKDIR /app
+RUN CGO_ENABLED=0 GOOS=linux go build -o gpt-load .
+
+# Final stage
+FROM alpine:3.18
+
+WORKDIR /app
+
+# 从 builder 阶段复制构建好的二进制文件
+COPY --from=builder /app/gpt-load /gpt-load
+# 从 builder 阶段复制构建好的前端文件
+COPY --from=builder /app/web/dist ./web/dist
+
+# 切换到 Choreo 指定的非 root 用户，这是最关键的修改！
+USER 10014
+
+# 设置容器的启动命令
+ENTRYPOINT ["/gpt-load"]
