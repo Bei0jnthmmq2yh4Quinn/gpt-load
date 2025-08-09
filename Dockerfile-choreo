@@ -26,7 +26,7 @@ COPY --from=builder /app/gpt-load /gpt-load
 # 从 builder 阶段复制构建好的前端文件
 COPY --from=builder /app/web/dist ./web/dist
 
-# 切换到 Choreo 指定的非 root 用户，这是最关键的修改！
+# 切换到 Choreo 指定的非 root 用户，这是解决此问题的关键！
 USER 10014
 
 # 设置容器的启动命令
